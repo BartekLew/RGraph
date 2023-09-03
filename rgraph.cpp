@@ -85,13 +85,32 @@ class CSV {
     }
 
     void plot(UshR &rsession) {
-        rsession.cmd() << "price_chart(squash(" << this->name << "," << chunks << "));" << endl;
+        rsession.cmd() << "n <- nrow(" << this->name << ")*" << this->range_size << ";" << endl
+                       << "p <- nrow(" << this->name << ")*" << this->range_pos << ";" << endl
+                       << "price_chart(squash(" << this->name << "[1:n+p,]," << chunks << "));" << endl;
     }
 
     CSV& change_resolution(float multiplier) {
-        this->chunks = this->chunks * multiplier;
+        this->chunks *= multiplier;
         if(this->chunks < 10) this->chunks = 10;
         else if (this->chunks > 200) this->chunks = 200;
+        return *this;
+    }
+
+    CSV& move(int chg) {
+        float max = 1.0 - this->range_size;
+        this->range_pos += chg * this->range_size;
+        if(this->range_pos < 0.0) this->range_pos = 0.0;
+        else if(this->range_pos > max) this->range_pos = max;
+        return *this;
+    }
+
+    CSV& zoom(float multiplier) {
+        float orig = this->range_size;
+        this->range_size *= multiplier;
+        if(this->range_size > 1) this->range_size = 1;
+
+        this->range_pos += orig - this->range_size;
         return *this;
     }
 
@@ -99,12 +118,15 @@ class CSV {
     getter(filename);
 
     protected:
-    CSV(string filename, string name): filename(filename), name(name), chunks(40) {}
+    CSV(string filename, string name): filename(filename), name(name),
+                                       chunks(60), range_size(1.0), range_pos(0.0)  {}
 
     string name;
     string filename;
 
     int chunks;
+    float range_size;
+    float range_pos;
 };
 
 typedef vector<CSV> CSVs;
@@ -191,6 +213,14 @@ class RGraph {
                     switch_set(1).plot(rproc);
                 } else if (code == 0xff540000) {
                     switch_set(-1).plot(rproc);
+                } else if (code == 0x3d0001) {
+                    dataset().zoom(0.75).plot(rproc);
+                } else if (code == 0x2d0000) {
+                    dataset().zoom(1.25).plot(rproc);
+                } else if (code == 0xff510000) {
+                    dataset().move(-1).plot(rproc);
+                } else if (code == 0xff530000) {
+                    dataset().move(1).plot(rproc);
                 }
                 else
                     cout << "unknown key " << hex << code << endl;
