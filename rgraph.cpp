@@ -98,6 +98,8 @@ class CSV {
     string filename;
 };
 
+typedef vector<CSV> CSVs;
+
 class DWMEvs {
     public:
     DWMEvs(string prefix) {
@@ -146,30 +148,41 @@ class DWMEvs {
     ifstream outstream;
 };
 
-typedef vector<CSV> CSVs;
-int main(int argc, char* argv[]) {
-    Args arg(argc,argv);
-
-    arg.runIf([] (istrings begin, istrings end) {
-        UshR rproc;
-
+class RGraph {
+    public:
+    RGraph(istrings csvs_begin, istrings csvs_end) : evs(DWMEvs("R Graphics")) {
         rproc.source("helpers.R");
-        CSVs csvs = CSVs();
-        for(istrings it = begin; it < end; it++) {
+
+        for(istrings it = csvs_begin; it < csvs_end; it++) {
             CSV csv(*it);
-            csvs.push_back(csv);
+            this->data.push_back(csv);
             rproc.let_csv(csv.get_name(), csv.get_filename());
         }
+    }
 
-        DWMEvs evs("R Graphics");
-        csvs[0].plot(rproc);
+    void run() {
+        this->data[0].plot(rproc);
 
-        while(auto ev = evs.next()) {
+        while(auto ev = this->evs.next()) {
             cout << ev.value() << endl;
         }
 
         cout << "evs end" << endl;
-
+    
         rproc.wait();
+    }
+
+    protected:
+    UshR rproc;
+    CSVs data;
+    DWMEvs evs;
+};
+
+int main(int argc, char* argv[]) {
+    Args arg(argc,argv);
+
+    arg.runIf([] (istrings begin, istrings end) {
+        RGraph graph(begin, end);
+        graph.run();
     });
 }
