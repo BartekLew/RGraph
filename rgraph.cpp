@@ -203,25 +203,25 @@ class RGraph {
                 int code = (stoi(matches[1].str(), 0, 16) << 16)
                          + stoi(matches[2].str(), 0, 16);
 
-                if(code == 0x5b0000) {
+                if(code == left_bracket) {
                     dataset().change_resolution(0.75)
                              .plot(rproc);
-                } else if (code == 0x5d0000) {
+                } else if (code == right_bracket) {
                     dataset().change_resolution(1.25)
                              .plot(rproc);
-                } else if (code == 0xff520000) {
+                } else if (code == up) {
                     switch_set(1).plot(rproc);
-                } else if (code == 0xff540000) {
+                } else if (code == down) {
                     switch_set(-1).plot(rproc);
-                } else if (code == 0x3d0001) {
+                } else if (code == plus) {
                     dataset().zoom(0.75).plot(rproc);
-                } else if (code == 0x2d0000) {
+                } else if (code == minus) {
                     dataset().zoom(1.25).plot(rproc);
-                } else if (code == 0xff510000) {
+                } else if (code == left) {
                     dataset().move(-1).plot(rproc);
-                } else if (code == 0xff530000) {
+                } else if (code == right) {
                     dataset().move(1).plot(rproc);
-                }
+                } 
                 else
                     cout << "unknown key " << hex << code << endl;
             }
@@ -249,6 +249,15 @@ class RGraph {
     DWMEvs evs;
 
     int plotnum;
+
+    static const int left_bracket = 0x5b0000;
+    static const int right_bracket = 0x5d0000;
+    static const int up = 0xff520000;
+    static const int down = 0xff540000;
+    static const int left = 0xff510000;
+    static const int right = 0xff530000;
+    static const int plus = 0x3d0001;
+    static const int minus = 0x2d0000;
 };
 
 int main(int argc, char* argv[]) {
