@@ -45,7 +45,7 @@ pch_up <- 24;
 pch_down <- 25;
 pch_dot <- 20;
 
-price_chart <- function(df, meanWindow=45) {
+price_chart <- function(df, meanWindow=30) {
     name <- deparse(substitute(df));
     df <- dfmap(df, function(row) {
                         data.frame(date=rep(as.POSIXct(row$date), 2),

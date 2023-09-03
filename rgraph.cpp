@@ -75,27 +75,36 @@ class Args {
 
 class CSV {
     public:
-    CSV(string filename): filename(filename) {
-        regex name_re("([^/]+).csv$");
+    static optional<CSV> from_file(string filename) {
         smatch matches;
-
-        if(regex_search(filename, matches, name_re)) {
-            this->name = matches[1].str();
+        if(regex_search(filename, matches, regex("([^/]+).csv$"))) {
+            return optional(CSV(filename, matches[1].str()));
         } else {
-            this->name = "??";
+            return optional<CSV>();
         }
     }
 
     void plot(UshR &rsession) {
-        rsession.cmd() << "price_chart(" << this->name << ");" << endl;
+        rsession.cmd() << "price_chart(squash(" << this->name << "," << chunks << "));" << endl;
+    }
+
+    CSV& change_resolution(float multiplier) {
+        this->chunks = this->chunks * multiplier;
+        if(this->chunks < 10) this->chunks = 10;
+        else if (this->chunks > 200) this->chunks = 200;
+        return *this;
     }
 
     getter(name);
     getter(filename);
 
     protected:
+    CSV(string filename, string name): filename(filename), name(name), chunks(40) {}
+
     string name;
     string filename;
+
+    int chunks;
 };
 
 typedef vector<CSV> CSVs;
@@ -150,21 +159,42 @@ class DWMEvs {
 
 class RGraph {
     public:
-    RGraph(istrings csvs_begin, istrings csvs_end) : evs(DWMEvs("R Graphics")) {
+    RGraph(istrings csvs_begin, istrings csvs_end) : evs(DWMEvs("R Graphics")), plotnum(0) {
         rproc.source("helpers.R");
 
         for(istrings it = csvs_begin; it < csvs_end; it++) {
-            CSV csv(*it);
-            this->data.push_back(csv);
-            rproc.let_csv(csv.get_name(), csv.get_filename());
+            if(auto csv = CSV::from_file(*it)) {
+                this->data.push_back(csv.value());
+                rproc.let_csv(csv.value().get_name(), csv.value().get_filename());
+            } else {
+                cerr << "Wrong csv filename: " << *it << endl;
+            };
         }
     }
 
     void run() {
-        this->data[0].plot(rproc);
+        dataset().plot(rproc);
 
         while(auto ev = this->evs.next()) {
-            cout << ev.value() << endl;
+            smatch matches;
+            if(regex_search(ev.value(), matches, regex("key:([0-9a-f]+)/([0-9a-f]+)"))) {
+                int code = (stoi(matches[1].str(), 0, 16) << 16)
+                         + stoi(matches[2].str(), 0, 16);
+
+                if(code == 0x5b0000) {
+                    dataset().change_resolution(0.75)
+                             .plot(rproc);
+                } else if (code == 0x5d0000) {
+                    dataset().change_resolution(1.25)
+                             .plot(rproc);
+                } else if (code == 0xff520000) {
+                    switch_set(1).plot(rproc);
+                } else if (code == 0xff540000) {
+                    switch_set(-1).plot(rproc);
+                }
+                else
+                    cout << "unknown key " << hex << code << endl;
+            }
         }
 
         cout << "evs end" << endl;
@@ -173,9 +203,22 @@ class RGraph {
     }
 
     protected:
+    CSV &dataset() { return data[plotnum]; }
+    CSV &switch_set(int change) { 
+        this->plotnum += change;
+        if(this->plotnum < 0)
+            this->plotnum = 0;
+        else if(this->plotnum >= data.size())
+            this->plotnum = data.size() - 1;
+
+        return dataset();
+    }
+
     UshR rproc;
     CSVs data;
     DWMEvs evs;
+
+    int plotnum;
 };
 
 int main(int argc, char* argv[]) {
