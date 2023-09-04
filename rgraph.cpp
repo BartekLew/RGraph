@@ -13,6 +13,23 @@ using namespace boost::process;
 typedef vector<string> strings;
 typedef strings::iterator istrings;
 
+class FileNotFoundException {
+    public:
+    FileNotFoundException(string filename): filename(filename) {}
+
+    void print(ostream &o) {
+        o << "File not found: " << this->filename << endl;
+    }
+
+    protected:
+    string filename;
+};
+
+bool exists(string filename) {
+    struct stat buffer;
+    return stat(filename.c_str(), &buffer) == 0;
+}
+
 class UshR {
     public:
     UshR() {
@@ -29,6 +46,9 @@ class UshR {
     void wait() { this->proc.wait(); }
 
     void source(string file) { 
+        if(!exists(file))
+            throw FileNotFoundException(file);
+
         this->input << "source('" << file << "');" << endl;
     }
 
@@ -41,7 +61,7 @@ class UshR {
         string ushin = fmt::format("/tmp/ush-{}", pid);
         struct stat buffer;
 
-        while(stat(ushin.c_str(), &buffer) != 0);
+        while(!exists(ushin) != 0);
 
         ofstream rcmd;
         rcmd.open(ushin);
@@ -264,7 +284,11 @@ int main(int argc, char* argv[]) {
     Args arg(argc,argv);
 
     arg.runIf([] (istrings begin, istrings end) {
-        RGraph graph(begin, end);
-        graph.run();
+        try {
+            RGraph graph(begin, end);
+            graph.run();
+        } catch (FileNotFoundException e) {
+            e.print(cerr);
+        }  
     });
 }
